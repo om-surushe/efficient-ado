@@ -1,0 +1,59 @@
+{
+  "name": "@om-surushe/efficient-ado",
+  "version": "0.1.0",
+  "description": "Efficient Azure DevOps MCP - LLM-optimized ADO workflows for AI assistants",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "efficient-ado": "dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Tests coming soon\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "azure-devops",
+    "ado",
+    "pull-request",
+    "work-items",
+    "ai",
+    "llm",
+    "claude",
+    "efficient"
+  ],
+  "author": "Om Surushe",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/om-surushe/efficient-ado.git"
+  },
+  "bugs": {
+    "url": "https://github.com/om-surushe/efficient-ado/issues"
+  },
+  "homepage": "https://github.com/om-surushe/efficient-ado#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "azure-devops-node-api": "^14.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.10",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
