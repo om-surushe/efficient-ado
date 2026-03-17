@@ -17,17 +17,10 @@ export const GetFileDiffSchema = z.object({
   project: z.string().optional().describe('Project name (uses default if not specified)'),
   repository: z.string().optional().describe('Repository name or ID (uses default if not specified)'),
   format: z
-    .enum(['unified', 'summary'])
+    .enum(['summary'])
     .optional()
-    .default('unified')
-    .describe('Diff format: unified (full diff) or summary (stats only). Default: unified'),
-  contextLines: z
-    .number()
-    .min(0)
-    .max(20)
-    .optional()
-    .default(3)
-    .describe('Number of context lines around changes (0-20, default: 3)'),
+    .default('summary')
+    .describe('Diff format: summary (change type and metadata). Use get_file_content with includeOriginal=true to retrieve both file versions for comparison.'),
 });
 
 export type GetFileDiffInput = z.infer<typeof GetFileDiffSchema>;
@@ -138,62 +131,18 @@ export async function getFileDiff(input: GetFileDiffInput): Promise<ToolResponse
         break;
     }
 
-    // For summary format, return just stats
-    if (params.format === 'summary') {
-      return {
-        success: true,
-        data: {
-          filePath: params.filePath,
-          changeType,
-          format: 'summary',
-          message: `File ${changeType}d in PR`,
-          suggestedActions: [
-            {
-              tool: 'get_file_diff',
-              params: { prId: params.prId, filePath: params.filePath, format: 'unified' },
-              reason: 'Get full diff with changes',
-              priority: 'high' as const,
-            },
-            {
-              tool: 'add_comment',
-              params: { prId: params.prId, filePath: params.filePath, line: 1 },
-              reason: 'Add inline comment on this file',
-              priority: 'medium' as const,
-            },
-          ],
-        },
-      };
-    }
-
-    // For unified format, we need to get actual file contents
-    // Note: ADO API doesn't provide unified diff directly, we'd need to:
-    // 1. Get original file content
-    // 2. Get modified file content
-    // 3. Generate diff manually (or use a diff library)
-    
-    // For now, return a simplified response with file info
-    // In a production system, you'd want to implement full unified diff generation
-
     return {
       success: true,
       data: {
         filePath: params.filePath,
         changeType,
-        format: 'unified',
-        message: 'Note: Full unified diff generation not yet implemented. Use get_file_content to get file contents.',
-        info: {
-          note: 'Azure DevOps API does not provide unified diffs directly. To see changes:',
-          alternatives: [
-            'Use get_file_content to get original and modified versions',
-            'Compare versions manually',
-            'View in Azure DevOps UI',
-          ],
-        },
+        format: 'summary',
+        message: `File ${changeType === 'add' ? 'added' : changeType === 'delete' ? 'deleted' : changeType === 'rename' ? 'renamed' : 'edited'} in PR`,
         suggestedActions: [
           {
             tool: 'get_file_content',
             params: { prId: params.prId, filePath: params.filePath, includeOriginal: true },
-            reason: 'Get original and modified file contents',
+            reason: 'Get original and modified file contents for comparison',
             priority: 'high' as const,
           },
           {
@@ -223,7 +172,7 @@ export async function getFileDiff(input: GetFileDiffInput): Promise<ToolResponse
 export const getFileDiffTool = {
   name: 'get_file_diff',
   description:
-    'Get the diff for a specific file in a pull request. Returns change information. Note: Azure DevOps API has limited diff support - use get_file_content to get original and modified versions for comparison. Useful for understanding what changed in a specific file.',
+    'Get change metadata for a specific file in a pull request (change type: add/edit/delete/rename). To compare actual file content, use get_file_content with includeOriginal=true which returns both the original and modified versions side-by-side.',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -242,19 +191,6 @@ export const getFileDiffTool = {
       repository: {
         type: 'string',
         description: 'Repository name or ID (uses default if not specified)',
-      },
-      format: {
-        type: 'string',
-        enum: ['unified', 'summary'],
-        description: 'Diff format: unified (full diff) or summary (stats only). Default: unified',
-        default: 'unified',
-      },
-      contextLines: {
-        type: 'number',
-        description: 'Number of context lines around changes (0-20, default: 3)',
-        minimum: 0,
-        maximum: 20,
-        default: 3,
       },
     },
     required: ['prId', 'filePath'],

@@ -317,9 +317,38 @@ export async function getPR(input: GetPRInput): Promise<ToolResponse<PRContext>>
 
       // Files (detailed only or explicit include)
       if (includes.includes('files') || params.level === 'detailed') {
-        // This would require additional API call to get file changes
-        // For now, we'll note that it needs implementation
-        context.files = [];
+        try {
+          const prCommits = await gitApi.getPullRequestCommits(repoId, params.prId, project);
+          const lastCommitId = prCommits?.[prCommits.length - 1]?.commitId;
+          const targetCommitId = pr.lastMergeTargetCommit?.commitId;
+          if (lastCommitId && targetCommitId) {
+            const diff = await gitApi.getCommitDiffs(repoId, project, true, 200, 0, {
+              baseVersion: targetCommitId,
+              baseVersionType: 0,
+              targetVersion: lastCommitId,
+              targetVersionType: 0,
+            });
+            if (diff?.changes) {
+              const mapCT = (ct: number | undefined): 'add' | 'edit' | 'delete' | 'rename' => {
+                if (ct === 1) return 'add';
+                if (ct === 4) return 'delete';
+                if (ct === 8) return 'rename';
+                return 'edit';
+              };
+              context.files = diff.changes
+                .filter((c) => !c.item?.isFolder)
+                .map((c) => ({
+                  path: c.item?.path || '',
+                  changeType: mapCT(c.changeType),
+                  additions: 0,
+                  deletions: 0,
+                }));
+              context.stats.files.changed = context.files.length;
+            }
+          }
+        } catch {
+          context.files = [];
+        }
       }
     }
 

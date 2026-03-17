@@ -4,9 +4,10 @@
  */
 
 import { z } from 'zod';
-import { getWorkItemApi, getClient } from '../client.js';
+import { getWorkItemApi } from '../client.js';
 import { getProject } from '../config.js';
 import { ToolResponse } from '../types.js';
+import { WORK_ITEM_TYPES } from '../constants.js';
 
 /**
  * Input schema for list_my_work_items
@@ -19,9 +20,9 @@ export const ListMyWorkItemsSchema = z.object({
     .default('Active')
     .describe('Filter by state (default: Active)'),
   type: z
-    .string()
+    .enum(WORK_ITEM_TYPES)
     .optional()
-    .describe('Filter by work item type (Task, Bug, User Story, etc.)'),
+    .describe('Filter by work item type (Task, Bug, User Story, Feature, Epic, Issue, Test Case, Impediment)'),
   limit: z.number().min(1).max(200).optional().default(50).describe('Maximum results (1-200, default: 50)'),
 });
 
@@ -37,27 +38,16 @@ export async function listMyWorkItems(input: ListMyWorkItemsInput): Promise<Tool
     const project = getProject(params.project);
     const witApi = await getWorkItemApi();
 
-    // Get current user
-    const connection = getClient();
-    const connectionData = await connection.connect();
-    const currentUser = connectionData.authenticatedUser?.displayName || '@Me';
-
-    // Build WIQL query
-    let stateFilter = '';
-    if (params.state !== 'All') {
-      stateFilter = `AND [State] = '${params.state}'`;
-    }
-
-    let typeFilter = '';
-    if (params.type) {
-      typeFilter = `AND [Work Item Type] = '${params.type}'`;
-    }
+    // Use @Me — ADO WIQL built-in for the authenticated user (no interpolation needed)
+    // State and type are validated enums — safe to interpolate
+    const stateFilter = params.state !== 'All' ? `AND [State] = '${params.state}'` : '';
+    const typeFilter = params.type ? `AND [Work Item Type] = '${params.type}'` : '';
 
     const wiql = `
       SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo], [System.ChangedDate]
       FROM WorkItems
-      WHERE [System.TeamProject] = '${project}'
-        AND [System.AssignedTo] = '${currentUser}'
+      WHERE [System.TeamProject] = @project
+        AND [System.AssignedTo] = @Me
         ${stateFilter}
         ${typeFilter}
       ORDER BY [System.ChangedDate] DESC
@@ -192,7 +182,8 @@ export const listMyWorkItemsTool = {
       },
       type: {
         type: 'string',
-        description: 'Filter by work item type (Task, Bug, User Story, etc.)',
+        enum: ['Task', 'Bug', 'User Story', 'Feature', 'Epic', 'Issue', 'Test Case', 'Impediment'],
+        description: 'Filter by work item type',
       },
       limit: {
         type: 'number',

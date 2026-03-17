@@ -7,6 +7,15 @@ import { Config, ConfigSchema } from './types.js';
 let globalConfig: Config | null = null;
 
 /**
+ * Mask a PAT token so it is never exposed in logs or error responses.
+ * Shows only the last 4 characters for identification.
+ */
+export function maskPAT(pat: string): string {
+  if (pat.length <= 4) return '****';
+  return `****${pat.slice(-4)}`;
+}
+
+/**
  * Set global configuration
  */
 export function setConfig(config: Config): void {

@@ -36,7 +36,11 @@ export const CompletePRSchema = z.object({
     .boolean()
     .optional()
     .default(false)
-    .describe('Bypass branch policies (requires permissions, use with caution)'),
+    .describe('Bypass branch policies (requires permissions). Must provide bypassReason when true.'),
+  bypassReason: z
+    .string()
+    .optional()
+    .describe('Required reason for bypassing branch policies. Must be non-empty when bypassPolicy is true.'),
   completeWorkItems: z
     .boolean()
     .optional()
@@ -114,6 +118,20 @@ export async function completePR(input: CompletePRInput): Promise<ToolResponse> 
       };
     }
 
+    // Require a reason when bypassing policies
+    if (params.bypassPolicy && !params.bypassReason?.trim()) {
+      return {
+        success: false,
+        error: {
+          code: 'BYPASS_REASON_REQUIRED',
+          message: 'A non-empty bypassReason is required when bypassPolicy is true.',
+          details: {
+            howToFix: 'Provide a bypassReason explaining why branch policies are being bypassed.',
+          },
+        },
+      };
+    }
+
     // Check merge status (unless bypassing)
     if (!params.bypassPolicy && pr.mergeStatus !== 3) {
       return {
@@ -174,7 +192,7 @@ export async function completePR(input: CompletePRInput): Promise<ToolResponse> 
         targetBranch: pr.targetRefName?.replace('refs/heads/', '') || '',
         sourceBranch: pr.sourceRefName?.replace('refs/heads/', '') || '',
         sourceDeleted: params.deleteSourceBranch,
-        message: `✅ PR #${params.prId} merged successfully using ${params.mergeStrategy} strategy`,
+        message: `PR #${params.prId} merged successfully using ${params.mergeStrategy} strategy${params.bypassPolicy ? ' [WARNING: Branch policies were bypassed — reason: ' + params.bypassReason + ']' : ''}`,
         details: {
           title: pr.title || '',
           url: `${pr.repository?.webUrl}/pullrequest/${pr.pullRequestId}`,
@@ -243,8 +261,12 @@ export const completePRTool = {
       },
       bypassPolicy: {
         type: 'boolean',
-        description: 'Bypass branch policies (requires permissions, use with caution)',
+        description: 'Bypass branch policies (requires permissions). Must provide bypassReason.',
         default: false,
+      },
+      bypassReason: {
+        type: 'string',
+        description: 'Required reason for bypassing branch policies (mandatory when bypassPolicy is true).',
       },
       completeWorkItems: {
         type: 'boolean',

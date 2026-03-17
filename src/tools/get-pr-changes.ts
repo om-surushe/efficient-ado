@@ -75,11 +75,7 @@ export async function getPRChanges(input: GetPRChangesInput): Promise<ToolRespon
         data: {
           files: [],
           count: 0,
-          stats: {
-            additions: 0,
-            deletions: 0,
-            totalChanges: 0,
-          },
+          stats: { totalChanges: 0 },
           message: 'No commits found in PR',
         },
       };
@@ -120,11 +116,7 @@ export async function getPRChanges(input: GetPRChangesInput): Promise<ToolRespon
         data: {
           files: [],
           count: 0,
-          stats: {
-            additions: 0,
-            deletions: 0,
-            totalChanges: 0,
-          },
+          stats: { totalChanges: 0 },
           message: 'No file changes found',
         },
       };
@@ -138,8 +130,6 @@ export async function getPRChanges(input: GetPRChangesInput): Promise<ToolRespon
       return {
         path: item?.path || '',
         changeType,
-        additions: 0, // Not provided by this API
-        deletions: 0, // Not provided by this API
         isDirectory: item?.isFolder || false,
         url: item?.url || '',
       };
@@ -150,8 +140,6 @@ export async function getPRChanges(input: GetPRChangesInput): Promise<ToolRespon
 
     // Calculate stats
     const stats = {
-      additions: 0, // Would need to parse actual diffs
-      deletions: 0, // Would need to parse actual diffs
       totalChanges: fileChanges.length,
     };
 
