@@ -56,6 +56,20 @@ import { getFileBlame, getFileBlameTool } from './tools/get-file-blame.js';
 import { listDirectory, listDirectoryTool } from './tools/list-directory.js';
 import { getBranchPolicies, getBranchPoliciesTool } from './tools/get-branch-policies.js';
 import { getWorkItemComments, getWorkItemCommentsTool } from './tools/get-work-item-comments.js';
+import { listBuilds, listBuildsTool } from './tools/list-builds.js';
+import { getBuild, getBuildTool } from './tools/get-build.js';
+import { triggerBuild, triggerBuildTool } from './tools/trigger-build.js';
+import { cancelBuild, cancelBuildTool } from './tools/cancel-build.js';
+import { getBuildLogs, getBuildLogsTool } from './tools/get-build-logs.js';
+import { listSprints, listSprintsTool } from './tools/list-sprints.js';
+import { getSprintBacklog, getSprintBacklogTool } from './tools/get-sprint-backlog.js';
+import { moveToSprint, moveToSprintTool } from './tools/move-to-sprint.js';
+import { getTeamBoard, getTeamBoardTool } from './tools/get-team-board.js';
+import { listReleases, listReleasesTool } from './tools/list-releases.js';
+import { getDeploymentStatus, getDeploymentStatusTool } from './tools/get-deployment-status.js';
+import { approveDeployment, approveDeploymentTool } from './tools/approve-deployment.js';
+import { listWikiPages, listWikiPagesTool } from './tools/list-wiki-pages.js';
+import { getWikiPage, getWikiPageTool } from './tools/get-wiki-page.js';
 
 /**
  * Create and configure MCP server
@@ -120,6 +134,20 @@ const tools = [
   listDirectoryTool,
   getBranchPoliciesTool,
   getWorkItemCommentsTool,
+  listBuildsTool,
+  getBuildTool,
+  triggerBuildTool,
+  cancelBuildTool,
+  getBuildLogsTool,
+  listSprintsTool,
+  getSprintBacklogTool,
+  moveToSprintTool,
+  getTeamBoardTool,
+  listReleasesTool,
+  getDeploymentStatusTool,
+  approveDeploymentTool,
+  listWikiPagesTool,
+  getWikiPageTool,
 ];
 
 /**
@@ -170,6 +198,20 @@ const toolHandlers: Record<string, (args: any) => Promise<any>> = {
   list_directory: listDirectory,
   get_branch_policies: getBranchPolicies,
   get_work_item_comments: getWorkItemComments,
+  list_builds: listBuilds,
+  get_build: getBuild,
+  trigger_build: triggerBuild,
+  cancel_build: cancelBuild,
+  get_build_logs: getBuildLogs,
+  list_sprints: listSprints,
+  get_sprint_backlog: getSprintBacklog,
+  move_to_sprint: moveToSprint,
+  get_team_board: getTeamBoard,
+  list_releases: listReleases,
+  get_deployment_status: getDeploymentStatus,
+  approve_deployment: approveDeployment,
+  list_wiki_pages: listWikiPages,
+  get_wiki_page: getWikiPage,
 };
 
 /**

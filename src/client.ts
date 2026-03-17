@@ -73,3 +73,19 @@ export async function getPolicyApi() {
   const client = getClient();
   return await client.getPolicyApi();
 }
+
+/**
+ * Get Release API
+ */
+export async function getReleaseApi() {
+  const client = getClient();
+  return await client.getReleaseApi();
+}
+
+/**
+ * Get Wiki API
+ */
+export async function getWikiApi() {
+  const client = getClient();
+  return await client.getWikiApi();
+}
