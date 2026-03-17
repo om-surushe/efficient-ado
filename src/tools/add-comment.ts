@@ -18,7 +18,10 @@ export const AddCommentSchema = z.object({
   content: z.string().describe('Comment content (supports markdown)'),
   // For inline comments
   filePath: z.string().optional().describe('File path for inline comment (e.g., "src/main.ts")'),
-  line: z.number().optional().describe('Line number for inline comment (1-indexed)'),
+  line: z.number().optional().describe('Start line number for inline comment (1-indexed)'),
+  endLine: z.number().optional().describe('End line number for inline comment (defaults to same as line for single-line comments)'),
+  lineOffset: z.number().optional().default(1).describe('Column offset for start of selection (1-indexed, default: 1)'),
+  endLineOffset: z.number().optional().default(1).describe('Column offset for end of selection (1-indexed, default: 1)'),
   isRightSide: z
     .boolean()
     .optional()
@@ -44,7 +47,12 @@ export async function addComment(input: AddCommentInput): Promise<ToolResponse> 
     const isInline = !!(params.filePath && params.line);
 
     if (isInline) {
-      // Inline comment - requires file context
+      // Inline comment - requires file context with both start AND end positions
+      const startLine = params.line!;
+      const endLine = params.endLine ?? startLine;
+      const startOffset = params.lineOffset ?? 1;
+      const endOffset = params.endLineOffset ?? 1;
+
       const thread: any = {
         comments: [
           {
@@ -56,16 +64,16 @@ export async function addComment(input: AddCommentInput): Promise<ToolResponse> 
         threadContext: {
           filePath: params.filePath!,
           rightFileStart: params.isRightSide
-            ? {
-                line: params.line!,
-                offset: 1,
-              }
+            ? { line: startLine, offset: startOffset }
+            : undefined,
+          rightFileEnd: params.isRightSide
+            ? { line: endLine, offset: endOffset }
             : undefined,
           leftFileStart: !params.isRightSide
-            ? {
-                line: params.line!,
-                offset: 1,
-              }
+            ? { line: startLine, offset: startOffset }
+            : undefined,
+          leftFileEnd: !params.isRightSide
+            ? { line: endLine, offset: endOffset }
             : undefined,
         },
       };
@@ -149,7 +157,7 @@ export async function addComment(input: AddCommentInput): Promise<ToolResponse> 
 export const addCommentTool = {
   name: 'add_comment',
   description:
-    'Add a comment to a pull request. Can add general comments (without file/line) or inline comments (with file/line). Inline comments appear on specific lines in the code diff. Supports markdown formatting. Returns thread ID and comment ID for future reference.',
+    'Add a comment to a pull request. General comment: provide only content. Inline comment: provide filePath + line (start line, 1-indexed); optionally endLine for a range and isRightSide=false for original side. Both rightFileStart and rightFileEnd are sent to ADO for proper text anchoring. Supports markdown. Returns thread ID and comment ID.',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -175,7 +183,21 @@ export const addCommentTool = {
       },
       line: {
         type: 'number',
-        description: 'Line number for inline comment (1-indexed)',
+        description: 'Start line number for inline comment (1-indexed)',
+      },
+      endLine: {
+        type: 'number',
+        description: 'End line number for inline comment (defaults to same as line for single-line)',
+      },
+      lineOffset: {
+        type: 'number',
+        description: 'Column offset for start of selection (1-indexed, default: 1)',
+        default: 1,
+      },
+      endLineOffset: {
+        type: 'number',
+        description: 'Column offset for end of selection (1-indexed, default: 1)',
+        default: 1,
       },
       isRightSide: {
         type: 'boolean',
