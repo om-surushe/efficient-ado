@@ -24,6 +24,8 @@ export const ListCommentsSchema = z.object({
     .optional()
     .default(false)
     .describe('Include system-generated comments (default: false)'),
+  limit: z.number().min(1).max(200).optional().default(100).describe('Maximum threads to return (1-200, default: 100)'),
+  skip: z.number().min(0).optional().default(0).describe('Number of threads to skip (for pagination)'),
 });
 
 export type ListCommentsInput = z.infer<typeof ListCommentsSchema>;
@@ -143,7 +145,11 @@ export async function listComments(input: ListCommentsInput): Promise<ToolRespon
       };
     });
 
-    // Calculate summary
+    // Paginate
+    const totalThreads = formattedThreads.length;
+    const paginatedThreads = formattedThreads.slice(params.skip, params.skip + params.limit);
+
+    // Calculate summary (across all filtered threads, not just page)
     const summary = {
       total: formattedThreads.length,
       byStatus: {
@@ -163,7 +169,7 @@ export async function listComments(input: ListCommentsInput): Promise<ToolRespon
     // Suggested actions
     const suggestedActions = [];
 
-    const activeThreads = formattedThreads.filter((t) => t.status === 'active');
+    const activeThreads = paginatedThreads.filter((t) => t.status === 'active');
     if (activeThreads.length > 0) {
       suggestedActions.push({
         tool: 'reply_to_thread',
@@ -182,8 +188,10 @@ export async function listComments(input: ListCommentsInput): Promise<ToolRespon
     return {
       success: true,
       data: {
-        threads: formattedThreads,
-        count: formattedThreads.length,
+        threads: paginatedThreads,
+        count: paginatedThreads.length,
+        hasMore: params.skip + paginatedThreads.length < totalThreads,
+        pagination: { skip: params.skip, limit: params.limit, total: totalThreads },
         summary,
         filters: {
           status: params.status || 'all',
@@ -235,6 +243,19 @@ export const listCommentsTool = {
         type: 'boolean',
         description: 'Include system-generated comments (default: false)',
         default: false,
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum threads to return (1-200, default: 100)',
+        minimum: 1,
+        maximum: 200,
+        default: 100,
+      },
+      skip: {
+        type: 'number',
+        description: 'Number of threads to skip (for pagination)',
+        minimum: 0,
+        default: 0,
       },
     },
     required: ['prId'],

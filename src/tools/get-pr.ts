@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { getGitApi } from '../client.js';
 import { getProject, getRepo } from '../config.js';
 import { ToolResponse, PRContext, ResponseLevel, PRPhase, PRStatus, Blocker } from '../types.js';
+import { VOTE_LABELS } from '../constants.js';
 
 /**
  * Input schema for get_pr
@@ -110,7 +111,7 @@ export async function getPR(input: GetPRInput): Promise<ToolResponse<PRContext>>
 
     // Get required reviewers
     const requiredReviewers = reviewers.filter((r) => r.isRequired);
-    const requiredApprovals = requiredReviewers.filter((r) => r.vote === 10).length;
+    const requiredApprovals = requiredReviewers.filter((r) => (r.vote ?? 0) >= 5).length;
 
     // Determine phase
     const status = mapPRStatus(pr.status);
@@ -311,6 +312,7 @@ export async function getPR(input: GetPRInput): Promise<ToolResponse<PRContext>>
           displayName: r.displayName || 'Unknown',
           isRequired: r.isRequired || false,
           vote: (r.vote as any) || 0,
+          voteLabel: VOTE_LABELS[r.vote ?? 0] || 'no vote',
           hasDeclined: r.hasDeclined || false,
         }));
       }

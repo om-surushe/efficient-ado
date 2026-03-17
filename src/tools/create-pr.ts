@@ -69,7 +69,9 @@ export async function createPr(input: CreatePRInput): Promise<ToolResponse> {
             code: 'NO_DEFAULT_BRANCH',
             message: `Repository ${repoId} has no default branch`,
           },
-          suggestedActions: ['Specify targetBranch explicitly', 'Use list_branches to see available branches'],
+          details: {
+              howToFix: 'Specify targetBranch explicitly, or use list_branches to see available branches',
+            },
         };
       }
       targetRef = repo.defaultBranch;
@@ -101,13 +103,14 @@ export async function createPr(input: CreatePRInput): Promise<ToolResponse> {
     }
 
     const prId = pr.pullRequestId;
+    const partialFailures: Array<{ item: string; error: string }> = [];
 
     // Link work items if specified
     if (params.workItemIds && params.workItemIds.length > 0) {
       const witApi = await getWorkItemApi();
-      for (const workItemId of params.workItemIds) {
-        try {
-          await witApi.updateWorkItem(
+      const wiResults = await Promise.allSettled(
+        params.workItemIds.map((workItemId) =>
+          witApi.updateWorkItem(
             undefined,
             [
               {
@@ -116,30 +119,40 @@ export async function createPr(input: CreatePRInput): Promise<ToolResponse> {
                 value: {
                   rel: 'ArtifactLink',
                   url: `vstfs:///Git/PullRequestId/${project}%2F${pr.repository?.id}%2F${prId}`,
-                  attributes: {
-                    name: 'Pull Request',
-                  },
+                  attributes: { name: 'Pull Request' },
                 },
               },
             ],
             workItemId,
             project
-          );
-        } catch (error) {
-          console.error(`Failed to link work item ${workItemId}:`, error);
+          )
+        )
+      );
+      wiResults.forEach((result, i) => {
+        if (result.status === 'rejected') {
+          partialFailures.push({
+            item: `work item #${params.workItemIds![i]}`,
+            error: result.reason instanceof Error ? result.reason.message : 'Failed to link',
+          });
         }
-      }
+      });
     }
 
     // Add reviewers if specified
     if (params.reviewers && params.reviewers.length > 0) {
-      for (const reviewerId of params.reviewers) {
-        try {
-          await gitApi.createPullRequestReviewer({ id: reviewerId }, repoId, prId, reviewerId, project);
-        } catch (error) {
-          console.error(`Failed to add reviewer ${reviewerId}:`, error);
+      const rvResults = await Promise.allSettled(
+        params.reviewers.map((reviewerId) =>
+          gitApi.createPullRequestReviewer({ id: reviewerId }, repoId, prId, reviewerId, project)
+        )
+      );
+      rvResults.forEach((result, i) => {
+        if (result.status === 'rejected') {
+          partialFailures.push({
+            item: `reviewer ${params.reviewers![i]}`,
+            error: result.reason instanceof Error ? result.reason.message : 'Failed to add',
+          });
         }
-      }
+      });
     }
 
     // Set auto-complete if requested
@@ -191,8 +204,22 @@ export async function createPr(input: CreatePRInput): Promise<ToolResponse> {
           vote: r.vote,
           isRequired: r.isRequired,
         })),
+        ...(partialFailures.length > 0 && { partialFailures }),
+        suggestedActions: [
+          {
+            tool: 'get_pr',
+            params: { prId: finalPr.pullRequestId, level: 'summary' },
+            reason: 'View the new PR',
+            priority: 'high' as const,
+          },
+          {
+            tool: 'add_comment',
+            params: { prId: finalPr.pullRequestId },
+            reason: 'Add a comment or description',
+            priority: 'low' as const,
+          },
+        ],
       },
-      suggestedActions: ['Use start_review to begin reviewing', 'Use add_comment to add comments'],
     };
   } catch (error: any) {
     return {
@@ -200,12 +227,10 @@ export async function createPr(input: CreatePRInput): Promise<ToolResponse> {
       error: {
         code: 'CREATE_PR_FAILED',
         message: error.message || 'Failed to create PR',
+        details: {
+          howToFix: 'Verify source and target branches exist using list_branches',
+        },
       },
-      suggestedActions: [
-        'Verify source branch exists using list_branches',
-        'Verify target branch exists using list_branches',
-        'Check branch names are correct',
-      ],
     };
   }
 }

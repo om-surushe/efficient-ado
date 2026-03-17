@@ -61,55 +61,54 @@ export async function manageReviewers(input: ManageReviewersInput): Promise<Tool
       errors: [] as Array<{ id: string; error: string }>,
     };
 
-    // Add reviewers
+    // Add reviewers in parallel
     if (params.addReviewers && params.addReviewers.length > 0) {
-      for (const reviewer of params.addReviewers) {
-        try {
+      const addResults = await Promise.allSettled(
+        params.addReviewers.map((reviewer) => {
           const reviewerData: IdentityRefWithVote = {
             id: reviewer.id,
             isRequired: reviewer.isRequired,
           };
+          return gitApi
+            .createPullRequestReviewer(reviewerData, repoId, params.prId, reviewer.id, project)
+            .then(() => ({ id: reviewer.id, isRequired: reviewer.isRequired }));
+        })
+      );
 
-          await gitApi.createPullRequestReviewer(
-            reviewerData,
-            repoId,
-            params.prId,
-            reviewer.id,
-            project
-          );
-
-          results.added.push({
-            id: reviewer.id,
-            isRequired: reviewer.isRequired,
-          });
-        } catch (error) {
+      addResults.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+          results.added.push(result.value);
+        } else {
           results.errors.push({
-            id: reviewer.id,
-            error: error instanceof Error ? error.message : 'Failed to add reviewer',
+            id: params.addReviewers![i].id,
+            error:
+              result.reason instanceof Error ? result.reason.message : 'Failed to add reviewer',
           });
         }
-      }
+      });
     }
 
-    // Remove reviewers
+    // Remove reviewers in parallel
     if (params.removeReviewers && params.removeReviewers.length > 0) {
-      for (const reviewerId of params.removeReviewers) {
-        try {
-          await gitApi.deletePullRequestReviewer(
-            repoId,
-            params.prId,
-            reviewerId,
-            project
-          );
+      const removeResults = await Promise.allSettled(
+        params.removeReviewers.map((reviewerId) =>
+          gitApi
+            .deletePullRequestReviewer(repoId, params.prId, reviewerId, project)
+            .then(() => reviewerId)
+        )
+      );
 
-          results.removed.push(reviewerId);
-        } catch (error) {
+      removeResults.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+          results.removed.push(result.value);
+        } else {
           results.errors.push({
-            id: reviewerId,
-            error: error instanceof Error ? error.message : 'Failed to remove reviewer',
+            id: params.removeReviewers![i],
+            error:
+              result.reason instanceof Error ? result.reason.message : 'Failed to remove reviewer',
           });
         }
-      }
+      });
     }
 
     // Get updated reviewer list
@@ -150,6 +149,18 @@ export async function manageReviewers(input: ManageReviewersInput): Promise<Tool
         reason: 'Notify new reviewers',
         priority: 'low' as const,
       });
+    }
+
+    // If all operations failed, return an error
+    if (results.errors.length > 0 && results.added.length === 0 && results.removed.length === 0) {
+      return {
+        success: false,
+        error: {
+          code: 'MANAGE_REVIEWERS_FAILED',
+          message: `All reviewer operations failed: ${results.errors.map((e) => e.error).join('; ')}`,
+          details: results.errors,
+        },
+      };
     }
 
     return {

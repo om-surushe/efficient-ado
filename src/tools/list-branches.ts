@@ -16,6 +16,7 @@ export const ListBranchesSchema = z.object({
   repository: z.string().optional().describe('Repository name or ID (uses default if not specified)'),
   filter: z.string().optional().describe('Filter branches by name (partial match)'),
   limit: z.number().min(1).max(100).optional().default(50).describe('Maximum results (1-100, default: 50)'),
+  skip: z.number().min(0).optional().default(0).describe('Number of branches to skip (for pagination)'),
 });
 
 export type ListBranchesInput = z.infer<typeof ListBranchesSchema>;
@@ -55,8 +56,9 @@ export async function listBranches(input: ListBranchesInput): Promise<ToolRespon
       );
     }
 
-    // Limit results
-    filteredRefs = filteredRefs.slice(0, params.limit);
+    // Paginate results
+    const totalFiltered = filteredRefs.length;
+    filteredRefs = filteredRefs.slice(params.skip, params.skip + params.limit);
 
     // Format branches
     const formattedBranches = filteredRefs.map((ref) => ({
@@ -103,6 +105,8 @@ export async function listBranches(input: ListBranchesInput): Promise<ToolRespon
       data: {
         branches: branchesWithDefault,
         count: branchesWithDefault.length,
+        hasMore: params.skip + branchesWithDefault.length < totalFiltered,
+        pagination: { skip: params.skip, limit: params.limit, total: totalFiltered },
         defaultBranch,
         repository: repoId,
         project,
@@ -149,6 +153,12 @@ export const listBranchesTool = {
         minimum: 1,
         maximum: 100,
         default: 50,
+      },
+      skip: {
+        type: 'number',
+        description: 'Number of branches to skip (for pagination)',
+        minimum: 0,
+        default: 0,
       },
     },
   },

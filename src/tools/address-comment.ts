@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { getGitApi } from '../client.js';
 import { getProject, getRepo } from '../config.js';
 import { ToolResponse } from '../types.js';
+import { threadStatusToNumber } from '../utils/status-map.js';
 
 /**
  * Input schema for address_comment
@@ -24,28 +25,6 @@ export const AddressCommentSchema = z.object({
 });
 
 export type AddressCommentInput = z.infer<typeof AddressCommentSchema>;
-
-/**
- * Map friendly status names to ADO status codes
- */
-function mapStatus(status: string): number {
-  switch (status.toLowerCase()) {
-    case 'active':
-      return 1;
-    case 'fixed':
-      return 2;
-    case 'wontfix':
-      return 3;
-    case 'closed':
-      return 4;
-    case 'bydesign':
-      return 5;
-    case 'pending':
-      return 6;
-    default:
-      return 2; // Default to "fixed"
-  }
-}
 
 /**
  * Address a comment (reply + update status)
@@ -86,7 +65,7 @@ export async function addressComment(input: AddressCommentInput): Promise<ToolRe
 
     // Step 2: Update thread status
     const targetStatus = params.status || 'fixed';
-    const statusCode = mapStatus(targetStatus);
+    const statusCode = threadStatusToNumber(targetStatus);
 
     const finalThread = await gitApi.updateThread(
       {
@@ -121,11 +100,21 @@ export async function addressComment(input: AddressCommentInput): Promise<ToolRe
           originalComment: firstComment?.content,
           latestReply: params.reply,
         },
+        suggestedActions: [
+          {
+            tool: 'list_comments',
+            params: { prId: params.prId, status: 'active' },
+            reason: 'See remaining active threads',
+            priority: 'medium' as const,
+          },
+          {
+            tool: 'get_pr',
+            params: { prId: params.prId, level: 'summary' },
+            reason: 'Check overall PR status',
+            priority: 'low' as const,
+          },
+        ],
       },
-      suggestedActions: [
-        'Use list_comments to see all updated threads',
-        'Use get_pr to see overall PR status',
-      ],
     };
   } catch (error: any) {
     return {
@@ -133,11 +122,10 @@ export async function addressComment(input: AddressCommentInput): Promise<ToolRe
       error: {
         code: 'ADDRESS_COMMENT_FAILED',
         message: error.message || 'Failed to address comment',
+        details: {
+          howToFix: 'Verify thread exists using list_comments, or try reply_to_thread and update_thread_status separately',
+        },
       },
-      suggestedActions: [
-        'Verify thread exists using list_comments',
-        'Try reply_to_thread and update_thread_status separately',
-      ],
     };
   }
 }

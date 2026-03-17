@@ -28,6 +28,7 @@ export const ListPRsSchema = z.object({
   sourceBranch: z.string().optional().describe('Filter by source branch name'),
   targetBranch: z.string().optional().describe('Filter by target branch name'),
   limit: z.number().min(1).max(100).optional().default(25).describe('Maximum results (1-100, default: 25)'),
+  skip: z.number().min(0).optional().default(0).describe('Number of PRs to skip (for pagination)'),
 });
 
 export type ListPRsInput = z.infer<typeof ListPRsSchema>;
@@ -88,7 +89,7 @@ export async function listPRs(input: ListPRsInput): Promise<ToolResponse> {
     };
 
     // Get PRs
-    const prs = await gitApi.getPullRequests(repoId, searchCriteria, project, undefined, 0, params.limit);
+    const prs = await gitApi.getPullRequests(repoId, searchCriteria, project, undefined, params.skip, params.limit);
 
     if (!prs || prs.length === 0) {
       return {
@@ -230,6 +231,8 @@ export async function listPRs(input: ListPRsInput): Promise<ToolResponse> {
             abandoned: prSummaries.filter((p) => p.status === 'abandoned').length,
           },
         },
+        hasMore: prSummaries.length === params.limit,
+        pagination: { skip: params.skip, limit: params.limit },
         filters: {
           project,
           repository: repoId,
@@ -300,6 +303,12 @@ export const listPRsTool = {
         minimum: 1,
         maximum: 100,
         default: 25,
+      },
+      skip: {
+        type: 'number',
+        description: 'Number of PRs to skip (for pagination)',
+        minimum: 0,
+        default: 0,
       },
     },
   },

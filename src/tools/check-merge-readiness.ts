@@ -89,7 +89,7 @@ export async function checkMergeReadiness(input: CheckMergeReadinessInput): Prom
     const waiting = reviewers.filter((r) => r.vote === -5).length;
 
     const requiredReviewers = reviewers.filter((r) => r.isRequired);
-    const requiredApprovals = requiredReviewers.filter((r) => r.vote === 10).length;
+    const requiredApprovals = requiredReviewers.filter((r) => (r.vote ?? 0) >= 5).length;
 
     // Build blockers list
     const blockers: Blocker[] = [];

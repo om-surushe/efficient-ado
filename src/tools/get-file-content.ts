@@ -92,6 +92,17 @@ export async function getFileContent(input: GetFileContentInput): Promise<ToolRe
 
       if (modifiedItem && modifiedItem.content) {
         modifiedContent = modifiedItem.content;
+        // Detect binary files (null bytes indicate non-text content)
+        if (modifiedContent.includes('\x00')) {
+          return {
+            success: false,
+            error: {
+              code: 'BINARY_FILE',
+              message: `File ${params.filePath} is a binary file and cannot be displayed as text`,
+              details: { filePath: params.filePath },
+            },
+          };
+        }
       }
     } catch (error) {
       // File might be deleted or not exist

@@ -6,7 +6,8 @@
 import { z } from 'zod';
 import { getGitApi } from '../client.js';
 import { getProject, getRepo } from '../config.js';
-import { ToolResponse, ThreadStatus } from '../types.js';
+import { ToolResponse } from '../types.js';
+import { threadStatusToNumber, threadNumberToStatus } from '../utils/status-map.js';
 
 /**
  * Input schema for update_thread_status
@@ -26,50 +27,6 @@ export const UpdateThreadStatusSchema = z.object({
 export type UpdateThreadStatusInput = z.infer<typeof UpdateThreadStatusSchema>;
 
 /**
- * Map status string to ADO number
- */
-function mapStatusToNumber(status: string): number {
-  switch (status) {
-    case 'active':
-      return 1;
-    case 'fixed':
-      return 2;
-    case 'wontFix':
-      return 3;
-    case 'closed':
-      return 4;
-    case 'byDesign':
-      return 5;
-    case 'pending':
-      return 6;
-    default:
-      return 1;
-  }
-}
-
-/**
- * Map ADO number to status string
- */
-function mapNumberToStatus(status: number | undefined): ThreadStatus {
-  switch (status) {
-    case 1:
-      return 'active';
-    case 2:
-      return 'fixed';
-    case 3:
-      return 'wontFix';
-    case 4:
-      return 'closed';
-    case 5:
-      return 'byDesign';
-    case 6:
-      return 'pending';
-    default:
-      return 'active';
-  }
-}
-
-/**
  * Update thread status
  */
 export async function updateThreadStatus(input: UpdateThreadStatusInput): Promise<ToolResponse> {
@@ -81,9 +38,8 @@ export async function updateThreadStatus(input: UpdateThreadStatusInput): Promis
 
     const gitApi = await getGitApi();
 
-    // Get existing thread first
-    const threads = await gitApi.getThreads(repoId, params.prId, project);
-    const thread = threads.find((t) => t.id === params.threadId);
+    // Get thread directly by ID
+    const thread = await gitApi.getPullRequestThread(repoId, params.prId, params.threadId, project);
 
     if (!thread) {
       return {
@@ -95,7 +51,7 @@ export async function updateThreadStatus(input: UpdateThreadStatusInput): Promis
       };
     }
 
-    const oldStatus = mapNumberToStatus(thread.status);
+    const oldStatus = threadNumberToStatus(thread.status);
 
     // Don't update if already at target status
     if (oldStatus === params.status) {
@@ -115,7 +71,7 @@ export async function updateThreadStatus(input: UpdateThreadStatusInput): Promis
 
     // Update status
     const updatedThread = {
-      status: mapStatusToNumber(params.status),
+      status: threadStatusToNumber(params.status),
     };
 
     await gitApi.updateThread(updatedThread, repoId, params.prId, params.threadId, project);

@@ -4,8 +4,8 @@
  */
 
 import { z } from 'zod';
-import { setConfig, isConfigured } from '../config.js';
-import { resetClient } from '../client.js';
+import { setConfig, isConfigured, maskPAT } from '../config.js';
+import { resetClient, getClient } from '../client.js';
 import { ToolResponse } from '../types.js';
 
 /**
@@ -36,6 +36,25 @@ export async function setupWorkspace(input: SetupWorkspaceInput): Promise<ToolRe
 
     // Reset client to use new config
     resetClient();
+
+    // Validate by testing the connection
+    try {
+      await getClient().connect();
+    } catch (err) {
+      resetClient();
+      return {
+        success: false,
+        error: {
+          code: 'CONNECTION_FAILED',
+          message: `Failed to connect to Azure DevOps: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          details: {
+            orgUrl: config.orgUrl,
+            patHint: maskPAT(config.pat),
+            howToFix: 'Check that orgUrl is correct and the PAT has not expired',
+          },
+        },
+      };
+    }
 
     return {
       success: true,

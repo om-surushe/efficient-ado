@@ -13,6 +13,8 @@ import { ToolResponse } from '../types.js';
  */
 export const ListRepositoriesSchema = z.object({
   project: z.string().optional().describe('Project name (uses default if not specified)'),
+  filter: z.string().optional().describe('Filter repositories by name (partial match)'),
+  limit: z.number().min(1).max(200).optional().default(100).describe('Maximum results (1-200, default: 100)'),
 });
 
 export type ListRepositoriesInput = z.infer<typeof ListRepositoriesSchema>;
@@ -42,7 +44,7 @@ export async function listRepositories(input: ListRepositoriesInput): Promise<To
     }
 
     // Format repositories
-    const formattedRepos = repos.map((repo) => ({
+    let formattedRepos = repos.map((repo) => ({
       id: repo.id!,
       name: repo.name || 'Unnamed',
       defaultBranch: repo.defaultBranch?.replace('refs/heads/', '') || 'main',
@@ -51,6 +53,15 @@ export async function listRepositories(input: ListRepositoriesInput): Promise<To
       size: repo.size || 0,
       isDisabled: repo.isDisabled || false,
     }));
+
+    // Filter by name if specified
+    if (params.filter) {
+      const filterLower = params.filter.toLowerCase();
+      formattedRepos = formattedRepos.filter((r) => r.name.toLowerCase().includes(filterLower));
+    }
+
+    const total = formattedRepos.length;
+    formattedRepos = formattedRepos.slice(0, params.limit);
 
     // Suggested actions
     const suggestedActions = [];
@@ -76,6 +87,7 @@ export async function listRepositories(input: ListRepositoriesInput): Promise<To
       data: {
         repositories: formattedRepos,
         count: formattedRepos.length,
+        hasMore: formattedRepos.length === params.limit && formattedRepos.length < total,
         project,
         suggestedActions,
       },
@@ -105,6 +117,17 @@ export const listRepositoriesTool = {
       project: {
         type: 'string',
         description: 'Project name (uses default if not specified)',
+      },
+      filter: {
+        type: 'string',
+        description: 'Filter repositories by name (partial match)',
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum results (1-200, default: 100)',
+        minimum: 1,
+        maximum: 200,
+        default: 100,
       },
     },
   },

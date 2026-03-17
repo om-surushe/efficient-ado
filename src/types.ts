@@ -165,6 +165,7 @@ export interface Reviewer {
   displayName: string;
   isRequired: boolean;
   vote: VoteType;
+  voteLabel?: string;
   hasDeclined: boolean;
 }
 

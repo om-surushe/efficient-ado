@@ -6,7 +6,8 @@
 import { z } from 'zod';
 import { getGitApi } from '../client.js';
 import { getProject, getRepo } from '../config.js';
-import { ToolResponse, ThreadStatus } from '../types.js';
+import { ToolResponse } from '../types.js';
+import { threadStatusToNumber, threadNumberToStatus } from '../utils/status-map.js';
 
 /**
  * Input schema for reply_to_thread
@@ -26,50 +27,6 @@ export const ReplyToThreadSchema = z.object({
 export type ReplyToThreadInput = z.infer<typeof ReplyToThreadSchema>;
 
 /**
- * Map status string to ADO number
- */
-function mapStatusToNumber(status: string): number {
-  switch (status) {
-    case 'active':
-      return 1;
-    case 'fixed':
-      return 2;
-    case 'wontFix':
-      return 3;
-    case 'closed':
-      return 4;
-    case 'byDesign':
-      return 5;
-    case 'pending':
-      return 6;
-    default:
-      return 1;
-  }
-}
-
-/**
- * Map ADO number to status string
- */
-function mapNumberToStatus(status: number | undefined): ThreadStatus {
-  switch (status) {
-    case 1:
-      return 'active';
-    case 2:
-      return 'fixed';
-    case 3:
-      return 'wontFix';
-    case 4:
-      return 'closed';
-    case 5:
-      return 'byDesign';
-    case 6:
-      return 'pending';
-    default:
-      return 'active';
-  }
-}
-
-/**
  * Reply to a comment thread
  */
 export async function replyToThread(input: ReplyToThreadInput): Promise<ToolResponse> {
@@ -81,9 +38,8 @@ export async function replyToThread(input: ReplyToThreadInput): Promise<ToolResp
 
     const gitApi = await getGitApi();
 
-    // Get existing thread first
-    const threads = await gitApi.getThreads(repoId, params.prId, project);
-    const thread = threads.find((t) => t.id === params.threadId);
+    // Get existing thread directly by ID
+    const thread = await gitApi.getPullRequestThread(repoId, params.prId, params.threadId, project);
 
     if (!thread) {
       return {
@@ -99,7 +55,7 @@ export async function replyToThread(input: ReplyToThreadInput): Promise<ToolResp
     const comment = {
       content: params.content,
       commentType: 1, // Text
-      parentCommentId: thread.comments?.[0]?.id || 0,
+      parentCommentId: thread.comments?.[thread.comments.length - 1]?.id || 0,
     };
 
     const createdComment = await gitApi.createComment(
@@ -112,12 +68,12 @@ export async function replyToThread(input: ReplyToThreadInput): Promise<ToolResp
 
     // Update status if requested
     let statusUpdated = false;
-    let newStatus = mapNumberToStatus(thread.status);
+    let newStatus = threadNumberToStatus(thread.status);
 
     if (params.updateStatus) {
       try {
         const updatedThread = {
-          status: mapStatusToNumber(params.updateStatus),
+          status: threadStatusToNumber(params.updateStatus),
         };
 
         await gitApi.updateThread(updatedThread, repoId, params.prId, params.threadId, project);
@@ -140,7 +96,7 @@ export async function replyToThread(input: ReplyToThreadInput): Promise<ToolResp
         status: {
           current: newStatus,
           updated: statusUpdated,
-          previous: statusUpdated ? mapNumberToStatus(thread.status) : newStatus,
+          previous: statusUpdated ? threadNumberToStatus(thread.status) : newStatus,
         },
         threadInfo: {
           type: isInline ? 'inline' : 'general',
