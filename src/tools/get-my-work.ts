@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { getGitApi, getWorkItemApi } from '../client.js';
+import { getGitApi, getWorkItemApi, getWorkApi } from '../client.js';
 import { getProject } from '../config.js';
 import { ToolResponse } from '../types.js';
 import { GitPullRequestSearchCriteria } from 'azure-devops-node-api/interfaces/GitInterfaces.js';
@@ -21,6 +21,12 @@ export const GetMyWorkSchema = z.object({
     .describe('Include completed/merged PRs (default: false)'),
   maxPRs: z.number().optional().default(10).describe('Maximum PRs to fetch per category (default: 10)'),
   maxWorkItems: z.number().optional().default(10).describe('Maximum work items to fetch (default: 10)'),
+  includeSprint: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('Include current sprint/iteration context (default: false)'),
+  team: z.string().optional().describe('Team name for sprint context (uses project default team if omitted)'),
 });
 
 export type GetMyWorkInput = z.infer<typeof GetMyWorkSchema>;
@@ -171,6 +177,58 @@ export async function getMyWork(input: GetMyWorkInput): Promise<ToolResponse> {
       },
     };
 
+    // Fetch sprint context if requested
+    let sprint: any = null;
+    if (params.includeSprint) {
+      try {
+        const workApi = await getWorkApi();
+        const teamContext = { project, ...(params.team ? { team: params.team } : {}) };
+        const iterations = await workApi.getTeamIterations(teamContext, 'current');
+        if (iterations && iterations.length > 0) {
+          const current = iterations[0];
+          sprint = {
+            id: current.id,
+            name: current.name,
+            path: current.path,
+            startDate: current.attributes?.startDate?.toISOString(),
+            finishDate: current.attributes?.finishDate?.toISOString(),
+            timeFrame: current.attributes?.timeFrame,
+          };
+        }
+      } catch {
+        // Sprint context is best-effort — don't fail the whole request
+      }
+    }
+
+    const suggestedActions = [];
+
+    if (summary.prsToReview.needsVote > 0) {
+      suggestedActions.push({
+        tool: 'list_prs',
+        params: { reviewerId: userId, status: 'active' },
+        reason: `${summary.prsToReview.needsVote} PR(s) need your review`,
+        priority: 'high' as const,
+      });
+    }
+
+    if (summary.myPRs.active > 0) {
+      suggestedActions.push({
+        tool: 'list_prs',
+        params: { createdBy: userId, status: 'active' },
+        reason: 'Check status of your active PRs',
+        priority: 'medium' as const,
+      });
+    }
+
+    if (summary.workItems.total > 0 && workItemDetails.length > 0) {
+      suggestedActions.push({
+        tool: 'get_work_item',
+        params: { id: workItemDetails[0].id },
+        reason: `View details for work item #${workItemDetails[0].id}`,
+        priority: 'low' as const,
+      });
+    }
+
     return {
       success: true,
       data: {
@@ -182,18 +240,9 @@ export async function getMyWork(input: GetMyWorkInput): Promise<ToolResponse> {
           id: currentUser.id,
           name: currentUser.providerDisplayName || currentUser.displayName,
         },
+        ...(sprint && { sprint }),
+        suggestedActions,
       },
-      suggestedActions: [
-        summary.prsToReview.needsVote > 0
-          ? `${summary.prsToReview.needsVote} PRs need your review - use start_review`
-          : undefined,
-        summary.myPRs.active > 0
-          ? 'Use get_pr to check status of your PRs'
-          : undefined,
-        summary.workItems.total > 0
-          ? 'Use get_work_item to see work item details'
-          : undefined,
-      ].filter(Boolean) as string[],
     };
   } catch (error: any) {
     return {
@@ -201,11 +250,10 @@ export async function getMyWork(input: GetMyWorkInput): Promise<ToolResponse> {
       error: {
         code: 'GET_MY_WORK_FAILED',
         message: error.message || 'Failed to get my work',
+        details: {
+          howToFix: 'Try list_prs with creatorId filter, or list_my_work_items for work items',
+        },
       },
-      suggestedActions: [
-        'Try list_prs with creatorId filter',
-        'Try list_my_work_items for work items',
-      ],
     };
   }
 }
@@ -235,6 +283,15 @@ export const getMyWorkTool = {
       maxWorkItems: {
         type: 'number',
         description: 'Maximum work items to fetch (default: 10)',
+      },
+      includeSprint: {
+        type: 'boolean',
+        description: 'Include current sprint/iteration context (default: false)',
+        default: false,
+      },
+      team: {
+        type: 'string',
+        description: 'Team name for sprint context (uses project default team if omitted)',
       },
     },
   },

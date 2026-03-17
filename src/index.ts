@@ -47,6 +47,15 @@ import { reactivatePr, reactivatePrTool } from './tools/reactivate-pr.js';
 import { addressComment, addressCommentTool } from './tools/address-comment.js';
 import { getMyWork, getMyWorkTool } from './tools/get-my-work.js';
 import { reportIssue, reportIssueTool } from './tools/report-issue.js';
+import { editComment, editCommentTool } from './tools/edit-comment.js';
+import { deleteComment, deleteCommentTool } from './tools/delete-comment.js';
+import { deleteBranch, deleteBranchTool } from './tools/delete-branch.js';
+import { deleteWorkItem, deleteWorkItemTool } from './tools/delete-work-item.js';
+import { queryWorkItems, queryWorkItemsTool } from './tools/query-work-items.js';
+import { getFileBlame, getFileBlameTool } from './tools/get-file-blame.js';
+import { listDirectory, listDirectoryTool } from './tools/list-directory.js';
+import { getBranchPolicies, getBranchPoliciesTool } from './tools/get-branch-policies.js';
+import { getWorkItemComments, getWorkItemCommentsTool } from './tools/get-work-item-comments.js';
 
 /**
  * Create and configure MCP server
@@ -102,6 +111,15 @@ const tools = [
   addressCommentTool,
   getMyWorkTool,
   reportIssueTool,
+  editCommentTool,
+  deleteCommentTool,
+  deleteBranchTool,
+  deleteWorkItemTool,
+  queryWorkItemsTool,
+  getFileBlameTool,
+  listDirectoryTool,
+  getBranchPoliciesTool,
+  getWorkItemCommentsTool,
 ];
 
 /**
@@ -143,6 +161,15 @@ const toolHandlers: Record<string, (args: any) => Promise<any>> = {
   address_comment: addressComment,
   get_my_work: getMyWork,
   report_issue: reportIssue,
+  edit_comment: editComment,
+  delete_comment: deleteComment,
+  delete_branch: deleteBranch,
+  delete_work_item: deleteWorkItem,
+  query_work_items: queryWorkItems,
+  get_file_blame: getFileBlame,
+  list_directory: listDirectory,
+  get_branch_policies: getBranchPolicies,
+  get_work_item_comments: getWorkItemComments,
 };
 
 /**

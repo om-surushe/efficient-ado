@@ -22,6 +22,8 @@ export const UpdateWorkItemSchema = z.object({
   effort: z.number().optional().describe('Story points or effort estimate'),
   remainingWork: z.number().optional().describe('Remaining work hours'),
   completedWork: z.number().optional().describe('Completed work hours'),
+  areaPath: z.string().optional().describe('Area path (e.g., "MyProject\\\\Frontend")'),
+  iterationPath: z.string().optional().describe('Iteration/sprint path (e.g., "MyProject\\\\Sprint 5")'),
 });
 
 export type UpdateWorkItemInput = z.infer<typeof UpdateWorkItemSchema>;
@@ -114,6 +116,22 @@ export async function updateWorkItem(input: UpdateWorkItemInput): Promise<ToolRe
         op: Operation.Replace,
         path: '/fields/Microsoft.VSTS.Scheduling.CompletedWork',
         value: params.completedWork,
+      });
+    }
+
+    if (params.areaPath !== undefined) {
+      patchDocument.push({
+        op: Operation.Replace,
+        path: '/fields/System.AreaPath',
+        value: params.areaPath,
+      });
+    }
+
+    if (params.iterationPath !== undefined) {
+      patchDocument.push({
+        op: Operation.Replace,
+        path: '/fields/System.IterationPath',
+        value: params.iterationPath,
       });
     }
 
@@ -228,6 +246,14 @@ export const updateWorkItemTool = {
       completedWork: {
         type: 'number',
         description: 'Completed work hours',
+      },
+      areaPath: {
+        type: 'string',
+        description: 'Area path (e.g., "MyProject\\\\Frontend")',
+      },
+      iterationPath: {
+        type: 'string',
+        description: 'Iteration/sprint path (e.g., "MyProject\\\\Sprint 5")',
       },
     },
     required: ['id'],

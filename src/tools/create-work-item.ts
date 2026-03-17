@@ -26,6 +26,8 @@ export const CreateWorkItemSchema = z.object({
   parentId: z.number().optional().describe('Parent work item ID (for creating child tasks)'),
   effort: z.number().optional().describe('Story points or effort estimate'),
   remainingWork: z.number().optional().describe('Remaining work hours'),
+  areaPath: z.string().optional().describe('Area path (e.g., "MyProject\\\\Frontend")'),
+  iterationPath: z.string().optional().describe('Iteration/sprint path (e.g., "MyProject\\\\Sprint 5")'),
 });
 
 export type CreateWorkItemInput = z.infer<typeof CreateWorkItemSchema>;
@@ -104,6 +106,22 @@ export async function createWorkItem(input: CreateWorkItemInput): Promise<ToolRe
         op: Operation.Add,
         path: '/fields/Microsoft.VSTS.Scheduling.RemainingWork',
         value: params.remainingWork,
+      });
+    }
+
+    if (params.areaPath) {
+      patchDocument.push({
+        op: Operation.Add,
+        path: '/fields/System.AreaPath',
+        value: params.areaPath,
+      });
+    }
+
+    if (params.iterationPath) {
+      patchDocument.push({
+        op: Operation.Add,
+        path: '/fields/System.IterationPath',
+        value: params.iterationPath,
       });
     }
 
@@ -235,6 +253,14 @@ export const createWorkItemTool = {
       remainingWork: {
         type: 'number',
         description: 'Remaining work hours',
+      },
+      areaPath: {
+        type: 'string',
+        description: 'Area path (e.g., "MyProject\\\\Frontend")',
+      },
+      iterationPath: {
+        type: 'string',
+        description: 'Iteration/sprint path (e.g., "MyProject\\\\Sprint 5")',
       },
     },
     required: ['type', 'title'],

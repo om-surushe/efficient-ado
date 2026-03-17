@@ -57,3 +57,19 @@ export async function getCoreApi() {
   const client = getClient();
   return await client.getCoreApi();
 }
+
+/**
+ * Get Work API (boards, iterations, team settings)
+ */
+export async function getWorkApi() {
+  const client = getClient();
+  return await client.getWorkApi();
+}
+
+/**
+ * Get Policy API (branch policies)
+ */
+export async function getPolicyApi() {
+  const client = getClient();
+  return await client.getPolicyApi();
+}
