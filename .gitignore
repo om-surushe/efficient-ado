@@ -10,3 +10,8 @@ coverage/
 test-real.js
 test-simple.mjs
 test-input.json
+
+# RuFlo / Claude-Flow
+.claude/
+.claude-flow/
+.mcp.json
